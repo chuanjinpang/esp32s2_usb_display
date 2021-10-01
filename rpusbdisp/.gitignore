@@ -1,0 +1,43 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# kernel intermedate files
+*.o.cmd
+*.ko
+modules.order
+Module.symvers
+.tmp_versions
+
+# Mac os DS_Store
+.DS_Store
+
+# Visual Studio user related project files
+*.opensdf
+*.sdf
+*.suo
+*.tlog
+*.log
+*.user
+
+# XCode user related project files
+xcshareddata
+xcuserdata
+
+# Build result
+Debug
+Release
+build
+doc
