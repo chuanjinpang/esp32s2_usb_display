@@ -3,7 +3,7 @@
 **overview**
 
 it's a USB mini display for Linux platform, such as raspberry Pi, Centos X86 server.
-
+it refer many opensource projects: robopeak/rpusbdisp,Bodmer/TFT_eSPI.git ,nopnop2002/esp-idf-ili9340,serge-rgb/TinyJPEG.git,TJpgDec. thanks 
 esp32s2 support USB OTG, the Linux host compress framebuffer Zone with JPEG, and then issue URB to esp32s2, the S2  wil decode JPEG stream bytes to RGB data,and use DMA SPI to ili9341 screen.
 
 now it can run ~13pfs in most time.
