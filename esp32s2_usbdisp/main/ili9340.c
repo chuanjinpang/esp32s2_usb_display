@@ -216,6 +216,11 @@ bool spi_master_write_colors_bytes_dma(TFT_t * dev, uint8_t * colors, uint16_t s
     return spi_master_write_byte_dma(dev->_SPIHandle, colors, size);
 }
 
+bool spi_master_write_colors_bytes(TFT_t * dev, uint8_t * colors, uint16_t size)
+{
+    gpio_set_level(dev->_dc, SPI_Data_Mode);
+    return spi_master_write_byte(dev->_SPIHandle, colors, size);
+}
 
 void delayMS(int ms)
 {
@@ -252,58 +257,128 @@ void lcdInit(TFT_t * dev, uint16_t model, int width, int height, int offsetx, in
     dev->_font_fill = false;
     dev->_font_underline = false;
 
-    if(dev->_model == 0x7796) {
-        ESP_LOGI(TAG, "Your TFT is ST7796");
+    if(dev->_model == 0x7789) {
+        ESP_LOGI(TAG, "Your TFT is ST7789");
         ESP_LOGI(TAG, "Screen width:%d", width);
         ESP_LOGI(TAG, "Screen height:%d", height);
-        spi_master_write_comm_byte(dev, 0xC0);	//Power Control 1
-        spi_master_write_data_byte(dev, 0x10);
-        spi_master_write_data_byte(dev, 0x10);
+#if 1
+		spi_master_write_comm_byte(dev, 0x01);	//Software Reset
+		delayMS(10);
 
-        spi_master_write_comm_byte(dev, 0xC1);	//Power Control 2
-        spi_master_write_data_byte(dev, 0x41);
+		spi_master_write_comm_byte(dev, 0x11);	//Sleep Out
+		delayMS(100);
+	
+        spi_master_write_comm_byte(dev, 0x3a);	
+        spi_master_write_data_byte(dev, 0x05);
+  
 
-        spi_master_write_comm_byte(dev, 0xC5);	//VCOM Control 1
+        spi_master_write_comm_byte(dev, 0xB2);	
+        spi_master_write_data_byte(dev, 0x0C);
+        spi_master_write_data_byte(dev, 0x0C);
         spi_master_write_data_byte(dev, 0x00);
-        spi_master_write_data_byte(dev, 0x22);
-        spi_master_write_data_byte(dev, 0x80);
-        spi_master_write_data_byte(dev, 0x40);
+        spi_master_write_data_byte(dev, 0x33);
+        spi_master_write_data_byte(dev, 0x33);
 
-        spi_master_write_comm_byte(dev, 0x36);	//Memory Access Control
-        spi_master_write_data_byte(dev, 0x48);	//Right top start, BGR color filter panel
-        //spi_master_write_data_byte(dev, 0x68);	//Right top start, BGR color filter panel
+        spi_master_write_comm_byte(dev, 0xB7);	//Gate Control
+        spi_master_write_data_byte(dev, 0x35);	
+		
+        spi_master_write_comm_byte(dev, 0xBB);	//VCOM Setting
+        spi_master_write_data_byte(dev, 0x19);
 
-        spi_master_write_comm_byte(dev, 0xB0);	//Interface Mode Control
-        spi_master_write_data_byte(dev, 0x00);
-
-        spi_master_write_comm_byte(dev, 0xB1);	//Frame Rate Control
-        spi_master_write_data_byte(dev, 0xB0);
-        spi_master_write_data_byte(dev, 0x11);
-
-        spi_master_write_comm_byte(dev, 0xB4);	//Display Inversion Control
-        spi_master_write_data_byte(dev, 0x02);
-
-        spi_master_write_comm_byte(dev, 0xB6);	//Display Function Control
-        spi_master_write_data_byte(dev, 0x02);
-        spi_master_write_data_byte(dev, 0x02);
-        spi_master_write_data_byte(dev, 0x3B);
-
-        spi_master_write_comm_byte(dev, 0xB7);	//Entry Mode Set
-        spi_master_write_data_byte(dev, 0xC6);
-
-        spi_master_write_comm_byte(dev, 0x3A);	//Interface Pixel Format
-        spi_master_write_data_byte(dev, 0x55);
-
-        spi_master_write_comm_byte(dev, 0xF7);	//Adjust Control 3
-        spi_master_write_data_byte(dev, 0xA9);
-        spi_master_write_data_byte(dev, 0x51);
+        spi_master_write_comm_byte(dev, 0xC0);	
         spi_master_write_data_byte(dev, 0x2C);
-        spi_master_write_data_byte(dev, 0x82);
 
-        spi_master_write_comm_byte(dev, 0x11);	//Sleep Out
-        delayMS(120);
+        spi_master_write_comm_byte(dev, 0xC2);	
+        spi_master_write_data_byte(dev, 0x01);
 
+		spi_master_write_comm_byte(dev, 0xC4);	
+		spi_master_write_data_byte(dev, 0x20);
+
+		spi_master_write_comm_byte(dev, 0xC6);	
+		spi_master_write_data_byte(dev, 0x0F);
+
+        spi_master_write_comm_byte(dev, 0xD0);	
+        spi_master_write_data_byte(dev, 0xA4);
+        spi_master_write_data_byte(dev, 0xA1);
+
+
+        spi_master_write_comm_byte(dev, 0xE0);	
+spi_master_write_data_byte(dev, 0xD0);
+spi_master_write_data_byte(dev, 0x04);
+spi_master_write_data_byte(dev, 0x0D);
+spi_master_write_data_byte(dev, 0x11);
+spi_master_write_data_byte(dev, 0x13);
+spi_master_write_data_byte(dev, 0x2B);
+spi_master_write_data_byte(dev, 0x3F);
+
+		spi_master_write_data_byte(dev, 0x54);
+		spi_master_write_data_byte(dev, 0x4C);
+		spi_master_write_data_byte(dev, 0x18);
+		spi_master_write_data_byte(dev, 0x0D);
+		spi_master_write_data_byte(dev, 0x0B);
+		spi_master_write_data_byte(dev, 0x1F);
+		spi_master_write_data_byte(dev, 0x23);
+
+
+				spi_master_write_comm_byte(dev, 0xE1);	
+		spi_master_write_data_byte(dev, 0xD0);
+		spi_master_write_data_byte(dev, 0x04);
+		spi_master_write_data_byte(dev, 0x0c);
+		spi_master_write_data_byte(dev, 0x11);
+		spi_master_write_data_byte(dev, 0x13);
+		spi_master_write_data_byte(dev, 0x2c);
+		spi_master_write_data_byte(dev, 0x3F);
+		
+				spi_master_write_data_byte(dev, 0x44);
+				spi_master_write_data_byte(dev, 0x51);
+				spi_master_write_data_byte(dev, 0x2f);
+				spi_master_write_data_byte(dev, 0x1f);
+				spi_master_write_data_byte(dev, 0x1f);
+				spi_master_write_data_byte(dev, 0x20);
+				spi_master_write_data_byte(dev, 0x23);
+
+		//spi_master_write_comm_byte(dev, 0x21);	
+		spi_master_write_comm_byte(dev, 0x13);	
+		    delayMS(10);
         spi_master_write_comm_byte(dev, 0x29);	//Display ON
+		#else
+	spi_master_write_comm_byte(dev, 0x01);	//Software Reset
+	delayMS(150);
+
+	spi_master_write_comm_byte(dev, 0x11);	//Sleep Out
+	delayMS(255);
+	
+	spi_master_write_comm_byte(dev, 0x3A);	//Interface Pixel Format
+	spi_master_write_data_byte(dev, 0x05);
+	delayMS(10);
+	
+	spi_master_write_comm_byte(dev, 0x36);	//Memory Data Access Control
+	spi_master_write_data_byte(dev, 0x00);
+
+	spi_master_write_comm_byte(dev, 0x2A);	//Column Address Set
+	spi_master_write_data_byte(dev, 0x00);
+	spi_master_write_data_byte(dev, 0x00);
+	spi_master_write_data_byte(dev, 0x00);
+	spi_master_write_data_byte(dev, 0xF0);
+
+	spi_master_write_comm_byte(dev, 0x2B);	//Row Address Set
+	spi_master_write_data_byte(dev, 0x00);
+	spi_master_write_data_byte(dev, 0x00);
+	spi_master_write_data_byte(dev, 0x00);
+	spi_master_write_data_byte(dev, 0xF0);
+
+	//spi_master_write_comm_byte(dev, 0x21);	//Display Inversion On
+	//delayMS(10);
+
+	spi_master_write_comm_byte(dev, 0x13);	//Normal Display Mode On
+	delayMS(10);
+
+	spi_master_write_comm_byte(dev, 0x29);	//Display ON
+	delayMS(255);
+
+
+
+		#endif
     } // endif 0x7796
 
     if(dev->_model == 0x9340 || dev->_model == 0x9341 || dev->_model == 0x7735) {
@@ -515,7 +590,7 @@ void lcdInit(TFT_t * dev, uint16_t model, int width, int height, int offsetx, in
 // x:X coordinate
 // y:Y coordinate
 // colors:colors
-void lcd_bitblt(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t * colors)
+void lcd_bitblt_dma(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t * colors)
 {
     uint16_t size = 0;
     if(x2 > dev->_width) return;
@@ -524,13 +599,32 @@ void lcd_bitblt(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,
     size = (x2 - x1) * (y2 - y1) * 2; //0-239
     spi_dma_wait(dev->_SPIHandle);
 
-    if(dev->_model == 0x9340 || dev->_model == 0x9341 || dev->_model == 0x7796) {
+    if(dev->_model == 0x9340 || dev->_model == 0x9341 ||dev->_model == 0x7789 ) {
         spi_master_write_comm_byte(dev, 0x2A);	// set column(x) address
         spi_master_write_addr(dev, x1, x2 - 1);
         spi_master_write_comm_byte(dev, 0x2B);	// set Page(y) address
         spi_master_write_addr(dev, y1, y2 - 1);
         spi_master_write_comm_byte(dev, 0x2C);	// Memory Write
         spi_master_write_colors_bytes_dma(dev, colors, size);
+    }
+}
+void lcd_bitblt(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t * colors)
+{
+    uint16_t size = 0;
+    if(x2 > dev->_width) return;
+    if(y2 > dev->_height) return;
+    size = (x2 - x1) * (y2 - y1) * 2; //0-239
+#if 0
+        ESP_LOGI(__FUNCTION__,"x1=%d x2=%d y1=%d y2=%d size:%d",x1, x2, y1, y2,size);
+     fflush(stdout);
+ #endif
+    if(dev->_model == 0x9340 || dev->_model == 0x9341 || dev->_model == 0x7789) {
+        spi_master_write_comm_byte(dev, 0x2A);	// set column(x) address
+        spi_master_write_addr(dev, x1, x2 - 1);
+        spi_master_write_comm_byte(dev, 0x2B);	// set Page(y) address
+        spi_master_write_addr(dev, y1, y2 - 1);
+        spi_master_write_comm_byte(dev, 0x2C);	// Memory Write
+        spi_master_write_colors_bytes(dev, colors, size);
     }
 
 }
@@ -552,13 +646,16 @@ void lcdInversionOn(TFT_t * dev)
 // Change Memory Access Control
 void lcdBGRFilter(TFT_t * dev)
 {
-    if(dev->_model == 0x9340 || dev->_model == 0x9341 || dev->_model == 0x7735 || dev->_model == 0x7796) {
+    if(dev->_model == 0x9340 || dev->_model == 0x9341 || dev->_model == 0x7735 ) {
+	ESP_LOGI(TAG, "Change LCD row colmn rgb order");
         spi_master_write_comm_byte(dev, 0x36);	//Memory Access Control
-        spi_master_write_data_byte(dev, (1 << 5) | (1 << 7) | (1 << 3));	//Right top start, RGB color filter panel
+        spi_master_write_data_byte(dev, (1 << 5) | (1 << 6) | (1 << 3));	//Right top start, RGB color filter panel
     } // endif 0x9340/0x9341/0x7735/0x7796
 
-    if(dev->_model == 0x9225 || dev->_model == 0x9226) {
-        lcdWriteRegisterByte(dev, 0x03, 0x0030); // set GRAM write direction and BGR=0.
+    if(dev->_model == 0x7789) {
+	ESP_LOGI(TAG, "7789Change LCD row colmn rgb order");
+        spi_master_write_comm_byte(dev, 0x36);	//Memory Access Control
+        spi_master_write_data_byte(dev, (1 << 5) | (1 << 7) );	
     } // endif 0x9225/0x9226
 }
 

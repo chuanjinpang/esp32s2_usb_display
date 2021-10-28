@@ -51,6 +51,7 @@ void lcdWriteRegisterByte(TFT_t * dev, uint8_t addr, uint16_t data);
 void lcdInit(TFT_t * dev, uint16_t model, int width, int height, int offsetx, int offsety);
 void lcdBGRFilter(TFT_t * dev);
 void lcd_bitblt(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t * colors) ;
+void lcd_bitblt_dma(TFT_t * dev, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t * colors);
 
 #endif /* MAIN_ILI9340_H_ */
 

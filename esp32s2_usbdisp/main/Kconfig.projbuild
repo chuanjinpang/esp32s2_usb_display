@@ -25,8 +25,8 @@ menu "TFT Configuration"
 			bool "ST7735"
 			help
 				Display Driver is ST7735.
-		config ST7796
-			bool "ST7796"
+		config ST7789
+			bool "ST7789"
 			help
 				Display Driver is ST7796S.
 	endchoice
@@ -63,7 +63,7 @@ menu "TFT Configuration"
         int "MOSI GPIO number"
         range 0 46
         default 23 if IDF_TARGET_ESP32
-        default 35 if IDF_TARGET_ESP32S2
+        default 34 if IDF_TARGET_ESP32S2
 		default 19 if IDF_TARGET_ESP32C3
         help
             GPIO number (IOxx) to SPI MOSI.
@@ -76,7 +76,7 @@ menu "TFT Configuration"
         int "SCLK GPIO number"
         range 0 46
         default 18 if IDF_TARGET_ESP32
-        default 36 if IDF_TARGET_ESP32S2
+        default 33 if IDF_TARGET_ESP32S2
 		default 18 if IDF_TARGET_ESP32C3
         help
             GPIO number (IOxx) to SPI SCLK.
@@ -88,7 +88,7 @@ menu "TFT Configuration"
 		int "CS GPIO number"
 		range 0 46
 		default 14 if IDF_TARGET_ESP32
-		default 34 if IDF_TARGET_ESP32S2
+		default 37 if IDF_TARGET_ESP32S2
 		default 9  if IDF_TARGET_ESP32C3
 		help
 			GPIO number (IOxx) to SPI CS.
@@ -100,7 +100,7 @@ menu "TFT Configuration"
 		int "DC GPIO number"
 		range 0 46
 		default 27 if IDF_TARGET_ESP32
-		default 37 if IDF_TARGET_ESP32S2
+		default 38 if IDF_TARGET_ESP32S2
 		default 10 if IDF_TARGET_ESP32C3
 		help
 			GPIO number (IOxx) to SPI DC.
@@ -112,7 +112,7 @@ menu "TFT Configuration"
 		int "RESET GPIO number"
 		range -1 46
 		default 33 if IDF_TARGET_ESP32
-		default 38 if IDF_TARGET_ESP32S2
+		default 1 if IDF_TARGET_ESP32S2
 		default 1  if IDF_TARGET_ESP32C3
 		help
 			GPIO number (IOxx) to RESET.
@@ -125,7 +125,7 @@ menu "TFT Configuration"
 		int "BACKLIGHT GPIO number"
 		range -1 46
 		default 32 if IDF_TARGET_ESP32
-		default 33 if IDF_TARGET_ESP32S2
+		default 2 if IDF_TARGET_ESP32S2
 		default 2  if IDF_TARGET_ESP32C3
 		help
 			GPIO number (IOxx) to BACKLIGHT.

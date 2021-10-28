@@ -117,7 +117,8 @@ typedef struct  {
 
 disp_bitblt_mgr_t  gblt;
 
-uint16_t lcd_color_line_buf[320+64] = {0};
+uint8_t lcd_color_line_buf[120*60*2+64] = {0xff};
+uint8_t lcd_color_line_buf_async_io[320*2+64] = {0};
 int lcd_color_line_buf_idx = 0;
 
 
@@ -191,8 +192,44 @@ static StreamBufferHandle_t disp_rx_ring_buf;
 void jpeg_bitblt(pixel_jpeg * pix_buf, JRECT *rect)
 {
 
-    lcd_bitblt(&gdev, gblt.x + rect->left, gblt.y + rect->top, gblt.x + rect->right + 1, gblt.y + rect->bottom + 1, (uint8_t *)pix_buf);
+    lcd_bitblt_dma(&gdev, gblt.x + rect->left, gblt.y + rect->top, gblt.x + rect->right + 1, gblt.y + rect->bottom + 1, (uint8_t *)pix_buf);
 
+}
+void dump_memory_bytes(char *prefix, uint8_t * hash,int bytes)
+{
+    char out[256] = { 0 };
+    int len = 0, i = 0;
+        for(i = 0; i < bytes; i++)
+        {
+            if(i && (i%16==0)) {
+            ESP_LOGI(TAG,"[%04d]%s %s\n",i,  prefix, out);
+            len=0;
+            }
+            len += sprintf(out + len, "0x%02x,", hash[i] & 0xff);
+        }
+          ESP_LOGI(TAG,"[%04d]%s %s\n",i,  prefix, out);
+}
+uint16_t g_crc16=0;
+uint16_t crc16_calc_multi(uint16_t crc_reg, unsigned char *puchMsg, unsigned int usDataLen ) 
+{ 
+uint16_t i,j,check; 
+	for(i=0;i<usDataLen;i++) 
+	{ 
+	crc_reg = (crc_reg>>8) ^ puchMsg[i]; 
+		for(j=0;j<8;j++) 
+		{ 
+			check = crc_reg & 0x0001; 
+			crc_reg >>= 1; 
+			if(check==0x0001){ 
+				crc_reg ^= 0xA001; 
+			} 
+		} 
+	} 
+return crc_reg; 
+}
+uint16_t crc16_calc(unsigned char *puchMsg, unsigned int usDataLen ) 
+{ 
+return crc16_calc_multi(0xFFFF,puchMsg,usDataLen);
 }
 void bitblt_msg_handle(uint8_t * msg, int len)
 {
@@ -201,14 +238,18 @@ void bitblt_msg_handle(uint8_t * msg, int len)
     memcpy(&lcd_color_line_buf[lcd_color_line_buf_idx], msg, len);
     lcd_color_line_buf_idx += len;
 
-    if(lcd_color_line_buf_idx >= line_size) { //got a line data
+   while(lcd_color_line_buf_idx >= line_size) { //got a line data
 
-        lcd_bitblt(&gdev, gblt.x, gblt.y_idx, gblt.x2, gblt.y_idx + 1, (uint8_t *)lcd_color_line_buf);
+		memcpy(lcd_color_line_buf_async_io,lcd_color_line_buf,line_size);//cpy for async dma
+        lcd_bitblt_dma(&gdev, gblt.x, gblt.y_idx, gblt.x2, gblt.y_idx + 1, (uint8_t *)lcd_color_line_buf_async_io);
         gblt.y_idx++;
         lcd_color_line_buf_idx -= line_size;
         gblt.disp_cnt += line_size;
         memcpy(lcd_color_line_buf, &lcd_color_line_buf[line_size], lcd_color_line_buf_idx);
         if(gblt.y_idx >= gblt.y2) {
+                //ESP_LOGI(TAG, "line:%d :%d buf:%d  %d %d %d ",gblt.y_idx,line_size,lcd_color_line_buf_idx,gblt.disp_cnt,gblt.cnt,gblt.total);
+                //ESP_LOGI(TAG, "draw tcost %lu %lu #:%lu %d crc:%x %x",gta,gtb,gtb-gta,gblt.done,gblt.fid,  g_crc16);
+				//fflush(stdout);
             render_done();
 
         }
@@ -283,16 +324,16 @@ int pop_msg_data(uint8_t * rx_buf, int len)
     }
 
     if(gblt.cnt >= gblt.total) { //ok we get all data ,so wait the lcd render done.
-        int max_wait_cnt = 3;
+        int max_wait_cnt = 20;
 
         while(max_wait_cnt-- && (0 == gblt.done)) {
             if(xTaskNotifyWait(0, 0, NULL, pdMS_TO_TICKS(200)) != pdPASS) {
-                ESP_LOGI(TAG, "Failed to wait for done!\n");
+                ESP_LOGI(TAG, "Failed to wait for done %d %d\n",max_wait_cnt,gblt.done);
             }
         }
 
         //printf("fps:%.2f\n",get_fps());
-        printf("t:%d fid:(%d)%d fps:%.2f\n", xTaskGetTickCount(), gblt.fid, gblt.total, get_fps());
+        ESP_LOGI(TAG, "t:%d fid:(%d)%d fps:%.2f\n", xTaskGetTickCount(), gblt.fid, gblt.total, get_fps());
 
 
 
@@ -300,7 +341,27 @@ int pop_msg_data(uint8_t * rx_buf, int len)
     return 0;
 }
 
+uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b) {
+uint16_t pix=(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+	return (pix >> 8) | (pix << 8);
+}
 /* Invoked when CDC interface received data from host */
+void fill_color(uint16_t *buf,int len,uint16_t color)
+{
+int i=0;
+    for(i=0;i<=len;i++) {			
+			buf[i]= color;
+		}
+}
+void fill_color_bar(uint16_t *buf,int len){
+#if 0
+    fill_color(buf,len/3,TEST_COLOR_RED);
+#else
+	fill_color(buf,len/3,rgb565(0xff, 0,0));
+    fill_color(&buf[len/3],len/3,rgb565(0,0xff, 0));
+    fill_color(&buf[(len*2)/3],len/3,rgb565(0,0,0xff));
+#endif
+}
 
 
 void tud_vendor_rx_cb(uint8_t itf)
@@ -313,8 +374,12 @@ void tud_vendor_rx_cb(uint8_t itf)
                                          CONFIG_USB_VENDOR_RX_BUFSIZE);
 
         if(read_res > 0) {
-
-
+            #if 0
+             if(CONFIG_USB_VENDOR_RX_BUFSIZE!=read_res){
+				ESP_LOGI(TAG, "cnt:%d %d %d %d",gblt.disp_cnt,gblt.cnt,gblt.total,xStreamBufferBytesAvailable(disp_rx_ring_buf));
+                ESP_LOGE(TAG, "!!!got data not:%d :%d %x", CONFIG_USB_VENDOR_RX_BUFSIZE,read_res,rx_buf[0]);
+                }
+             #endif
             if(rx_buf[0] & RPUSBDISP_CMD_FLAG_START) {
                 if(0 == render_task)
                     render_task = xTaskGetCurrentTaskHandle();
@@ -338,7 +403,10 @@ void tud_vendor_rx_cb(uint8_t itf)
                     gblt.disp_cnt = 0;
                     gblt.cnt += read_res - sizeof(rpusbdisp_disp_bitblt_packet_t);
                     gblt.done = 0;
-                    //ESP_LOGI(TAG, "rx bblt x:%d y:%d w:%d h:%d total:%d (%d)",pblt->x,pblt->y,pblt->width,pblt->height,gblt.total,(pblt->width)*(pblt->height)*2);
+					xStreamBufferReset(disp_rx_ring_buf);
+					lcd_color_line_buf_idx=0;//maybe this cause idx bug? when data is transfer done
+					g_crc16=0xffff;
+                    ESP_LOGI(TAG, "rx bblt x:%d y:%d w:%d h:%d total:%d (%d)",pblt->x,pblt->y,pblt->width,pblt->height,gblt.total,(pblt->width)*(pblt->height)*2);
                     pop_msg_data(&rx_buf[sizeof(rpusbdisp_disp_bitblt_packet_t)], read_res - sizeof(rpusbdisp_disp_bitblt_packet_t));
                     break;
                 }
@@ -436,6 +504,9 @@ void ILI9341(void *pvParameters)
     uint16_t model = 0x9341;
 #endif
 
+#if CONFIG_ST7789
+		uint16_t model = 0x7789;
+#endif
     lcdInit(&gdev, model, CONFIG_WIDTH, CONFIG_HEIGHT, CONFIG_OFFSETX, CONFIG_OFFSETY);
 
 #if CONFIG_INVERSION
@@ -449,16 +520,25 @@ void ILI9341(void *pvParameters)
     lcdBGRFilter(&gdev);
 #endif
     display_logo();
+#if 0
+    	{
 
+		int x=0,y=0;
+			fill_color_bar(lcd_color_line_buf,120*60);	   
+			lcd_bitblt(&gdev,x,y,x+120,y+60,lcd_color_line_buf);
+    	}
+#endif
     while(1) {
 
 #if 1
         if(xStreamBufferBytesAvailable(disp_rx_ring_buf) >= 1) {
 
             if(gblt.cmd == RPUSBDISP_DISPCMD_BITBLT) {
+				{
                 size_t xReceivedBytes = xStreamBufferReceive(disp_rx_ring_buf, mrx_buf, CONFIG_USB_VENDOR_RX_BUFSIZE,  pdMS_TO_TICKS(200));
                 if(xReceivedBytes)
                     bitblt_msg_handle(mrx_buf, xReceivedBytes);
+				}
 
             } else
 
