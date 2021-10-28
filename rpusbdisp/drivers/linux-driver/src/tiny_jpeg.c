@@ -132,7 +132,7 @@ int main()
 #ifdef _WIN32
 #define tje_log(msg) OutputDebugStringA(msg)
 #elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
-#define tje_log(msg) LOG(msg)
+#define tje_log LOG
 #else
 #warning "need a tje_log definition for your platform for debugging purposes (not needed if compiling with NDEBUG)"
 #endif
@@ -148,6 +148,8 @@ typedef struct {
 } TJEWriteContext;
 
 typedef struct {
+	uint8_t huffsize[4][257];
+    uint16_t huffcode[4][256];
     // Huffman data.
     uint8_t         ehuffsize[4][257];
     uint16_t        ehuffcode[4][256];
@@ -830,29 +832,18 @@ static OPTIMIZE_ATTR void tjei_huff_expand(TJEState* state)
     }
 
     // Fill out the extended tables..
-#if 1
-    static  uint8_t huffsize[4][257];
-    static  uint16_t huffcode[4][256];
-#else
-    uint8_t (*huffsize)[257] = xmalloc(4 * 257);
-    uint16_t (* huffcode)[256] = xmalloc(4 * 256 * sizeof(uint16_t));
-    if(!huffsize || !huffcode) {
-        LOGW("huff alloc NG\n");
-        return;
-    }
-#endif
     for(i = 0; i < 4; ++i) {
         assert(256 >= spec_tables_len[i]);
-        tjei_huff_get_code_lengths(huffsize[i], state->ht_bits[i]);
-        tjei_huff_get_codes(huffcode[i], huffsize[i], spec_tables_len[i]);
+        tjei_huff_get_code_lengths(state->huffsize[i], state->ht_bits[i]);
+        tjei_huff_get_codes(state->huffcode[i], state->huffsize[i], spec_tables_len[i]);
     }
     for(i = 0; i < 4; ++i) {
         int64_t count = spec_tables_len[i];
         tjei_huff_get_extended(state->ehuffsize[i],
                                state->ehuffcode[i],
                                state->ht_vals[i],
-                               &huffsize[i][0],
-                               &huffcode[i][0], count);
+                               &state->huffsize[i][0],
+                               &state->huffcode[i][0], count);
     }
 }
 
@@ -1157,45 +1148,61 @@ int tje_encode_to_ctx_at_quality(void * ctx,
 
 int tje_encode_with_func(tje_write_func* func,
                          void* context,
-                         const int quality,
+                         const int iquality,
                          const int width,
                          const int height,
                          const int num_components,
                          const unsigned char* src_data)
 {
+#define MAX_JPG_QUAILITY 10
 
-
-    static     TJEState state = { 0 };
+    TJEState *pstate ;
     uint8_t qt_factor = 1;
+	int quality=iquality;
     int i;
-    if(quality < 1 || quality > 3) {
-        tje_log("[ERROR] -- Valid 'quality' values are 1 (lowest), 2, or 3 (highest)\n");
-        return 0;
+    if(quality < 1 || quality > MAX_JPG_QUAILITY) {
+        tje_log("[ERROR] -- Valid 'quality'%d values are 1 (lowest), 2,3,4,5,(highest)\n",quality);
+       if(quality<1)
+	   	 quality=1;
+	   else
+	   	 quality=MAX_JPG_QUAILITY;
     }
-
+    pstate=xmalloc(sizeof(TJEState));
+	if(!pstate){
+		LOGW("state malloc NG\n");
+		return -1;
+    }
+	memset(pstate,0,sizeof(TJEState));
     //LOGI("%s w:%d h:%d c:%d quality:%d\n",__FUNCTION__,width,height,num_components,quality);
     switch(quality) {
-    case 3:
+    case MAX_JPG_QUAILITY:
         for(i = 0; i < 64; ++i) {
-            state.qt_luma[i]   = 1;
-            state.qt_chroma[i] = 1;
+            pstate->qt_luma[i]   = 1;
+            pstate->qt_chroma[i] = 1;
         }
         break;
+	case 9:
+	case 8:
+	case 7:
+	case 6:
+	case 5:
+	case 4:
+	case 3:
     case 2:
         //qt_factor = 5;
-        qt_factor = 3;//less size but less quality 13.xfps
+        qt_factor = quality;//less size but less quality 13.xfps
         //qt_factor = 2;//13.xfps
         //qt_factor = 4;//13.xfps
         // don't break. fall through.
     case 1:
         for(i = 0; i < 64; ++i) {
-            state.qt_luma[i]   = tjei_default_qt_luma_from_spec[i] / qt_factor;
-            if(state.qt_luma[i] == 0) {
-                state.qt_luma[i] = 1;
+            pstate->qt_luma[i]   = tjei_default_qt_luma_from_spec[i] / qt_factor;
+            if(pstate->qt_luma[i] == 0) {
+                pstate->qt_luma[i] = 1;
             }
-            state.qt_chroma[i] = tjei_default_qt_chroma_from_paper[i] / qt_factor;
-            if(state.qt_chroma[i] == 0) {
-                state.qt_chroma[i] = 1;
+            pstate->qt_chroma[i] = tjei_default_qt_chroma_from_paper[i] / qt_factor;
+            if(pstate->qt_chroma[i] == 0) {
+                pstate->qt_chroma[i] = 1;
             }
         }
         break;
@@ -1209,13 +1216,14 @@ int tje_encode_with_func(tje_write_func* func,
     wc.context = context;
     wc.func = func;
 
-    state.write_context = wc;
+    pstate->write_context = wc;
 
 
-    tjei_huff_expand(&state);
+    tjei_huff_expand(pstate);
 
-    int result = tjei_encode_main(&state, src_data, width, height, num_components);
+    int result = tjei_encode_main(pstate, src_data, width, height, num_components);
 
+	xfree(pstate);
     return result;
 }
 // ============================================================

@@ -29,33 +29,36 @@
 #define RPUSBDISP_OPERATION_OR              2
 #define RPUSBDISP_OPERATION_AND             3
 
+#define RPUSBDISP_CMD_MASK                  (0x3F)
+#define RPUSBDISP_CMD_FLAG_CLEARDITY        (0x1<<6)
+#define RPUSBDISP_CMD_FLAG_START            (0x1<<7)
+
+
+#define USBDISP_CMD_BITBLT           2
+#define USBDISP_CMD_BITBLT_JPEG       5
+
+
+#define USBDISP_CMD_FLAG_START            (0x1<<7)
+#define USBDISP_CMD_FLAG_END              (0x1<<6)
 #if defined(_WIN32) || defined(__ICCARM__)
 #pragma pack(1)
 #endif
 
 
-#define RPUSBDISP_CMD_MASK                  (0x3F)
-#define RPUSBDISP_CMD_FLAG_CLEARDITY        (0x1<<6)
-#define RPUSBDISP_CMD_FLAG_START            (0x1<<7)
-typedef struct _rpusbdisp_disp_packet_header_t {
-#if 0
-    _u8 cmd: 6;
-    _u8 cleardirty: 1;
-    _u8 start: 1;
-#else
+typedef struct _usbdisp_disp_packet_header_t {
     _u8 cmd_flag;
-#endif
-} __attribute__((packed)) rpusbdisp_disp_packet_header_t;
+
+} __attribute__((packed)) usbdisp_disp_packet_header_t;
 
 
 typedef struct _rpusbdisp_disp_fill_packet_t {
-    rpusbdisp_disp_packet_header_t header;
+    usbdisp_disp_packet_header_t header;
     _u16 color_565;
 } __attribute__((packed)) rpusbdisp_disp_fill_packet_t;
 
 
-typedef struct _rpusbdisp_disp_bitblt_packet_t {
-    rpusbdisp_disp_packet_header_t header;
+typedef struct _usbdisp_disp_bitblt_packet_t {
+    usbdisp_disp_packet_header_t header;
     _u8  operation;
     _u16 padding;
     _u16 x;
@@ -64,11 +67,11 @@ typedef struct _rpusbdisp_disp_bitblt_packet_t {
     _u16 height;
     _u32 total_bytes;//padding 32bit align
 
-} __attribute__((packed)) rpusbdisp_disp_bitblt_packet_t;
+} __attribute__((packed)) usbdisp_disp_bitblt_packet_t;
 
 
 typedef struct _rpusbdisp_disp_fillrect_packet_t {
-    rpusbdisp_disp_packet_header_t header;
+    usbdisp_disp_packet_header_t header;
     _u16 left;
     _u16 top;
     _u16 right;
@@ -79,7 +82,7 @@ typedef struct _rpusbdisp_disp_fillrect_packet_t {
 
 
 typedef struct _rpusbdisp_disp_copyarea_packet_t {
-    rpusbdisp_disp_packet_header_t header;
+    usbdisp_disp_packet_header_t header;
     _u16 sx;
     _u16 sy;
     _u16 dx;

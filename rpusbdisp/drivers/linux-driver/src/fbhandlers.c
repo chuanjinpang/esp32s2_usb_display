@@ -19,6 +19,8 @@
 #include <linux/module.h>
 #include <linux/uaccess.h>
 
+//#define LOG(args...) do {printk(args);} while(0)
+#define LOG(args...) do {} while(0)
 
 static struct fb_info * _default_fb;
 
@@ -207,6 +209,7 @@ static  void _display_fillrect(struct fb_info * p, const  struct fb_fillrect * r
 #ifdef SYS_FB_SYMBOL
     sys_fillrect(p, rect);
 #endif
+	LOG("%s \n", __FUNCTION__);
     _display_update(p, rect->dx, rect->dy, rect->width, rect->height, DISPLAY_UPDATE_HINT_FILLRECT, rect);
 }
 
@@ -216,6 +219,7 @@ static  void _display_imageblit(struct fb_info * p, const  struct fb_image * ima
 
     sys_imageblit(p, image);
 #endif
+	LOG("%s \n", __FUNCTION__);
     _display_update(p, image->dx, image->dy, image->width, image->height, DISPLAY_UPDATE_HINT_BITBLT, image);
 }
 
@@ -225,6 +229,7 @@ static  void _display_copyarea(struct fb_info * p, const  struct fb_copyarea * a
 
     sys_copyarea(p, area);
 #endif
+	LOG("%s \n", __FUNCTION__);
     _display_update(p, area->dx, area->dy, area->width, area->height, DISPLAY_UPDATE_HINT_COPYAREA, area);
 }
 
@@ -305,6 +310,7 @@ static ssize_t _display_write(struct fb_info * p, const  char * buf __user,
 #else
     retval = my_fb_sys_write(p, buf, count, ppos);
 #endif
+	LOG("%s\n", __FUNCTION__);
     _display_update(p, 0, 0, p->var.width, p->var.height, DISPLAY_UPDATE_HINT_NONE, NULL);
 
     return retval;
@@ -378,6 +384,7 @@ static void _display_defio_handler(struct fb_info *info,
     }
     if(bottom >= RP_DISP_DEFAULT_HEIGHT) bottom = RP_DISP_DEFAULT_HEIGHT - 1;
 
+	LOG("%s\n", __FUNCTION__);
 
     _display_update(info, 0, top, info->var.width, bottom - top + 1, DISPLAY_UPDATE_HINT_NONE, NULL);
 }
@@ -549,7 +556,7 @@ failed:
 static void _on_release_fb(struct fb_info * fb)
 {
     if(!fb) return;
-
+	LOG("%s\n",__FUNCTION__);
     // del the defio
     fb_deferred_io_cleanup(fb);
 
@@ -563,8 +570,9 @@ static void _on_release_fb(struct fb_info * fb)
 }
 
 
-int __init register_fb_handlers(void)
+int  register_fb_handlers(void)
 {
+	LOG("%s\n",__FUNCTION__);
     return _on_create_new_fb(&_default_fb, NULL);
 }
 
@@ -585,7 +593,8 @@ void fbhandler_on_all_transfer_done(struct rpusbdisp_dev * dev)
     fb_pri = _get_fb_private(fb);
 
     if(atomic_read(&fb_pri->dirty_rect.dirty_flag) || atomic_read(&fb_pri->unsync_flag) == 1) {
-        _display_update(fb, 0, 0, RP_DISP_DEFAULT_WIDTH, RP_DISP_DEFAULT_HEIGHT,   DISPLAY_UPDATE_HINT_NONE, NULL);
+		//LOG("%s\n", __FUNCTION__);
+       // _display_update(fb, 0, 0, RP_DISP_DEFAULT_WIDTH, RP_DISP_DEFAULT_HEIGHT,   DISPLAY_UPDATE_HINT_NONE, NULL);
     }
 
 }

@@ -117,6 +117,7 @@ extern "C"
 #define LOGI(args...) do {printk(args);} while(0)
 #define LOGW(args...) do {printk(args);} while(0)
 #define xmalloc(x) kmalloc((x),GFP_KERNEL)
+#define xfree(x) kfree((x))
 #define assert(x) WARN_ON(!(x))
 
 #else

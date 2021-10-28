@@ -60,19 +60,20 @@ static int __init usb_disp_init(void)
     }
     printk("fps %d\n", fps);
     do {
-
+#if 0
         result = register_touch_handler();
         if(result) {
             err("touch_handler failed. Error number %d", result);
             break;
         }
-
+#endif
+#if 0
         result = register_fb_handlers();
         if(result) {
             err("fb handler register failed. Error number %d", result);
             break;
         }
-
+#endif
         result = register_usb_handlers();
         if(result) {
             err("usb_register failed. Error number %d", result);
@@ -90,8 +91,8 @@ static int __init usb_disp_init(void)
 static void __exit usb_disp_exit(void)
 {
     unregister_usb_handlers();
-    unregister_fb_handlers();
-    unregister_touch_handler();
+   //unregister_fb_handlers();
+   // unregister_touch_handler();
 }
 
 module_init(usb_disp_init);

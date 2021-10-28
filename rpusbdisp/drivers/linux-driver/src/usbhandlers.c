@@ -112,6 +112,7 @@ struct rpusbdisp_dev {
 #define JPEG_MAX_SIZE (RP_DISP_DEFAULT_HEIGHT*RP_DISP_DEFAULT_WIDTH*3)
     uint8_t sg_buf[JPEG_MAX_SIZE];
     stream_mgr_t smgr;
+	int jpg_quality;
 };
 
 
@@ -478,36 +479,35 @@ struct bitblt_encoding_context_t {
 static uint16_t gfid = 0;
 
 
-static int _bitblt_encode_command_header(uint8_t * msg, int x, int y, int right, int bottom, int clear_dirty, _u8 op_flg)
+static int _bitblt_encode_command_header(uint8_t * msg, int x, int y, int right, int bottom,  uint8_t op_flg)
 {
-    rpusbdisp_disp_bitblt_packet_t * bitblt_header ;
+    usbdisp_disp_bitblt_packet_t * bitblt_header ;
+
 
     // encoding the command header...
 
-    bitblt_header = (rpusbdisp_disp_bitblt_packet_t *)msg;
+    bitblt_header = (usbdisp_disp_bitblt_packet_t *)msg;
     bitblt_header->header.cmd_flag = op_flg;
-    bitblt_header->header.cmd_flag |= RPUSBDISP_CMD_FLAG_START;
-    if(clear_dirty) {
-        bitblt_header->header.cmd_flag |= RPUSBDISP_CMD_FLAG_CLEARDITY;
-    }
-    bitblt_header->padding = gfid;
+    bitblt_header->header.cmd_flag |= USBDISP_CMD_FLAG_START;
+
+    bitblt_header->padding = 0;
     bitblt_header->x = cpu_to_le16(x);
     bitblt_header->y = cpu_to_le16(y);
     bitblt_header->width = cpu_to_le16(right + 1 - x);
     bitblt_header->height = cpu_to_le16(bottom + 1 - y);
-    bitblt_header->operation = RPUSBDISP_OPERATION_COPY;
+    bitblt_header->operation = 0;
 
 
-    return sizeof(rpusbdisp_disp_bitblt_packet_t);
+    return sizeof(usbdisp_disp_bitblt_packet_t);
 
 }
 
 static int _bitblt_encode_command_header_total_bytes(uint8_t * msg, int total_bytes)
 {
-    rpusbdisp_disp_bitblt_packet_t * bitblt_header ;
-    bitblt_header = (rpusbdisp_disp_bitblt_packet_t *)msg;
+    usbdisp_disp_bitblt_packet_t * bitblt_header ;
+    bitblt_header = (usbdisp_disp_bitblt_packet_t *)msg;
     bitblt_header->total_bytes = total_bytes;
-    return sizeof(rpusbdisp_disp_bitblt_packet_t);
+    return sizeof(usbdisp_disp_bitblt_packet_t);
 }
 
 static void _bitblt_encoder_cleanup(struct bitblt_encoding_context_t * ctx, struct rpusbdisp_dev * dev)
@@ -598,8 +598,8 @@ static int _bitblt_encode_n_transfer_data(struct bitblt_encoding_context_t * ctx
 
             // encoding the header
             *ctx->urbbuffer = 0;
-            ((rpusbdisp_disp_packet_header_t *)ctx->urbbuffer)->cmd_flag = RPUSBDISP_DISPCMD_BITBLT;
-            ctx->encoded_pos = sizeof(rpusbdisp_disp_packet_header_t);
+            ((usbdisp_disp_packet_header_t *)ctx->urbbuffer)->cmd_flag = RPUSBDISP_DISPCMD_BITBLT;
+            ctx->encoded_pos = sizeof(usbdisp_disp_packet_header_t);
 
         }
     }
@@ -620,7 +620,7 @@ int encoder_ctx_init(struct bitblt_encoding_context_t * ctx, struct rpusbdisp_de
     // do not transmit zero size image
     if(!msg_size) return -1;
 
-    effective_payload_per_packet_size = dev->disp_out_ep_max_size - sizeof(rpusbdisp_disp_packet_header_t);
+    effective_payload_per_packet_size = dev->disp_out_ep_max_size - sizeof(usbdisp_disp_packet_header_t);
     packet_count = (msg_size + effective_payload_per_packet_size - 1) / effective_payload_per_packet_size;
     required_tickets_count = (packet_count + dev->disp_tickets_pool.packet_size_factor - 1) / dev->disp_tickets_pool.packet_size_factor;
 
@@ -688,7 +688,7 @@ long get_system_us(void)
     return get_os_us();
 }
 long gta, gtb;
-#define FPS_STAT_MAX 8
+#define FPS_STAT_MAX 6
 typedef struct {
     long tb[FPS_STAT_MAX];
     int cur;
@@ -724,20 +724,26 @@ int rpusbdisp_usb_try_send_jpeg_image(struct rpusbdisp_dev * dev, const pixel_ty
     int ret = 0;
     int pos = 0;
     uint8_t * pix_msg;
-    stream_mgr_t * mgr = &dev->smgr;
-    _u16 total_bytes = 0;
+	stream_mgr_t m_mgr;
+    stream_mgr_t * mgr = &m_mgr;
+    uint16_t total_bytes = 0;
+	int msg_pos=0;
+	uint8_t * msg=dev->msg;
+	uint8_t * urb_msg=dev->sg_buf;
+	int jpg_quality=dev->jpg_quality;
+	int target_quaility_size=12*1024;
 
 
     // estimate how many tickets are needed
-    const size_t image_size = (right - x + 1) * (bottom - y + 1) * (RP_DISP_DEFAULT_PIXEL_BITS / 8);
+    size_t image_size = (right - x + 1) * (bottom - y + 1) * (RP_DISP_DEFAULT_PIXEL_BITS / 8);
 
     // do not transmit zero size image
-    if(!image_size) return 1;
+    if(!image_size) return -1;
 
 
-    dev->msg_pos = _bitblt_encode_command_header(dev->msg, x, y, right, bottom, clear_dirty, RPUSBDISP_DISPCMD_BITBLT_JPEG);
+    msg_pos = _bitblt_encode_command_header(msg, x, y, right, bottom, USBDISP_CMD_BITBLT_JPEG);
 
-    pix_msg = &dev->msg[dev->msg_pos];
+    pix_msg = &msg[msg_pos];
     // locate to the begining...
     framebuffer += (y * line_width + x);
 
@@ -755,7 +761,7 @@ int rpusbdisp_usb_try_send_jpeg_image(struct rpusbdisp_dev * dev, const pixel_ty
             *pix_msg++ = r;
             *pix_msg++ = g;
             *pix_msg++ = b;
-            dev->msg_pos += 3;
+            msg_pos += 3;
 
 #else
             pixel_type_t pix = *framebuffer;
@@ -766,7 +772,7 @@ int rpusbdisp_usb_try_send_jpeg_image(struct rpusbdisp_dev * dev, const pixel_ty
             *pix_msg++ = r;
             *pix_msg++ = g;
             *pix_msg++ = b;
-            dev->msg_pos += 3;
+            msg_pos += 3;
 
 #endif
 
@@ -776,29 +782,59 @@ int rpusbdisp_usb_try_send_jpeg_image(struct rpusbdisp_dev * dev, const pixel_ty
         }
         framebuffer += line_width - right - 1 + x;
     }
+	long fps=get_fps();
+	int low_quality=-1;;
+	int high_quality=-1;
+	redo:
     {
         //ok we use jpeg transfer data
 
-        mgr->data = dev->sg_buf;
+        mgr->data =urb_msg;
         mgr->max = JPEG_MAX_SIZE;
         mgr->dp = 0;
-        if(!tje_encode_to_ctx(mgr, (right - x + 1), (bottom - y + 1), 3, &dev->msg[sizeof(rpusbdisp_disp_bitblt_packet_t)], 2)) {
+        if(!tje_encode_to_ctx(mgr, (right - x + 1), (bottom - y + 1), 3, &msg[sizeof(usbdisp_disp_bitblt_packet_t)], jpg_quality)) {
             LOG("Could not encode JPEG\n");
         }
-
     }
+	LOG("jpg: total:%d %d\n",  mgr->dp, jpg_quality);
+	if(fps>=60)//we think this may video case
+	{
+	#define ABS(x) ((x) < 0 ? -(x) : (x))
 
+		if(ABS(mgr->dp - target_quaility_size)<2*1024)
+					goto next;
+		if(high_quality>0 && low_quality>0)
+			goto next;
+		if(mgr->dp > target_quaility_size) {
+			high_quality=jpg_quality;
+			if(jpg_quality>=2){
+				jpg_quality--;
+				goto redo;
+    }
+	   	}else {
+	   		low_quality=jpg_quality;
+				if(jpg_quality<=5) {
+						jpg_quality++;
+						goto redo;
+					}
+	   	}		   
+	}
+	else {
+			jpg_quality=5;
+		}
+	next:
+	dev->jpg_quality=jpg_quality;
+    memcpy(&msg[sizeof(usbdisp_disp_bitblt_packet_t)], mgr->data, mgr->dp);
 
-    memcpy(&dev->msg[sizeof(rpusbdisp_disp_bitblt_packet_t)], mgr->data, mgr->dp);
-
-    total_bytes = sizeof(rpusbdisp_disp_bitblt_packet_t) + mgr->dp;
-    _bitblt_encode_command_header_total_bytes(dev->msg, total_bytes);
+    total_bytes = sizeof(usbdisp_disp_bitblt_packet_t) + mgr->dp;
+    _bitblt_encode_command_header_total_bytes(msg, total_bytes);
     //
-    gfid++;
     ret = rpusbdisp_usb_send_msg(dev, dev->msg, total_bytes);
-    if(ret >= 0)
+    if(ret >= 0) {
         put_fps_data(get_system_us());
-    LOGI("jpg:%d %d %d %d %d total:%d (%d) fid:%d fps:%d(x10)\n", ret, x, y, right, bottom, total_bytes, dev->msg_pos, gfid, get_fps());
+	}
+    LOG("jpg:%d %d %d %d %d total:%d (%d) fid:%d fps:%d(x10)\n", ret, x, y, right, bottom, total_bytes, dev->msg_pos, gfid, get_fps());
+    	
     return ret;
 
 
@@ -846,7 +882,7 @@ int rpusbdisp_usb_try_send_image(struct rpusbdisp_dev * dev, const pixel_type_t 
     // do not transmit zero size image
     if(!image_size) return 1;
 
-#define JPEG_TRANSFER_SIZE (0*1024)
+#define JPEG_TRANSFER_SIZE (10*1024)
     if(image_size > JPEG_TRANSFER_SIZE) { //ok we use jpeg transfer data
 #if 1
         return   rpusbdisp_usb_try_send_jpeg_image(dev, framebuffer, x, y, right, bottom, line_width, clear_dirty);
@@ -858,7 +894,7 @@ int rpusbdisp_usb_try_send_image(struct rpusbdisp_dev * dev, const pixel_type_t 
     }
 
 
-    dev->msg_pos = _bitblt_encode_command_header(dev->msg, x, y, right, bottom, clear_dirty, RPUSBDISP_DISPCMD_BITBLT);
+    dev->msg_pos = _bitblt_encode_command_header(dev->msg, x, y, right, bottom,  RPUSBDISP_DISPCMD_BITBLT);
     pix_msg = (uint16_t *)&dev->msg[dev->msg_pos];
     // locate to the begining...
     framebuffer += (y * line_width + x);
@@ -870,9 +906,9 @@ int rpusbdisp_usb_try_send_image(struct rpusbdisp_dev * dev, const pixel_type_t 
 #ifdef PIXEL_32BIT
             pixel_type_t pix = *framebuffer;
             uint8_t r, g, b;
-            r = pix & 0xff;
+            b = pix & 0xff;
             g = (pix >> 8) & 0xff;
-            b = (pix >> 16) & 0xff;
+            r = (pix >> 16) & 0xff;
             uint16_t current_pixel_le = rgb565(r, g, b);
             current_pixel_le = (current_pixel_le >> 8) | (current_pixel_le << 8);
             *pix_msg = current_pixel_le;
@@ -881,6 +917,7 @@ int rpusbdisp_usb_try_send_image(struct rpusbdisp_dev * dev, const pixel_type_t 
 
 #else
             pixel_type_t current_pixel_le = cpu_to_le16(*framebuffer);
+			current_pixel_le = (current_pixel_le >> 8) | (current_pixel_le << 8);
             *pix_msg = current_pixel_le;
             pix_msg++;
             dev->msg_pos += sizeof(pixel_type_t);
@@ -1045,6 +1082,7 @@ static int _on_new_usb_device(struct rpusbdisp_dev * dev)
     // start status querying...
     _status_start_querying(dev);
 
+	register_fb_handlers();
     fbhandler_on_new_device(dev);
     touchhandler_on_new_device(dev);
 
@@ -1071,6 +1109,7 @@ static void _on_del_usb_device(struct rpusbdisp_dev * dev)
 
     touchhandler_on_remove_device(dev);
     fbhandler_on_remove_device(dev);
+	unregister_fb_handlers();
 
     // kill all pending urbs
     usb_kill_urb(dev->urb_status_query);
@@ -1161,7 +1200,7 @@ static int rpusbdisp_probe(struct usb_interface *interface, const struct usb_dev
     }
 
 
-
+	dev->jpg_quality=5;
 #if 0
 
     /* we can register the device now, as it is ready */
